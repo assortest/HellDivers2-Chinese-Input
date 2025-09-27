@@ -64,6 +64,11 @@ namespace TypingChinese
         //托盘相关
         private NotifyIcon trayIcon; //定义一个托盘图标
         private ContextMenuStrip trayMenu; //用于托盘的菜单
+
+        //存储当前热键
+        private uint currentModifiers;
+        private uint currentKey;
+
         //窗口拖动相关
         private bool isDragging = false;
         private Point lastCursor;
@@ -71,7 +76,7 @@ namespace TypingChinese
 
 
         //定义热键的名称
-        private const uint MOD_CTRL = 0x0002; // CTRL键
+       // private const uint MOD_CTRL = 0x0002; // CTRL键
         //定义热键按下
         private const uint WM_HOTKEY = 0x0312;
         // 热键 ID，用于识别哪个热键被按下
@@ -80,6 +85,7 @@ namespace TypingChinese
         const int INPUT_KEYBOARD = 1;//输入类型为键盘
         const uint KEYEVENTF_KEYUP = 0x0002;//键位释放
         const uint KEYEVENTF_UNICODE = 0x0004;//Unicode字符
+        //Windows API相关
         [DllImport("user32.dll")] //注册热键
         private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint key, uint vk);
         [DllImport("user32.dll")]
@@ -90,6 +96,13 @@ namespace TypingChinese
         static extern bool SetForegroundWindow(IntPtr hWnd);
         [DllImport("user32.dll")]
         static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+        //[DllImport("user32.dll")]//附加线程输入
+        //static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+        //[DllImport("kernel32.dll")]
+        //static extern uint GetCurrentThreadId();
+        //[DllImport("user32.dll")]
+        //static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
         public Form1()
         {
             InitializeComponent();
@@ -98,26 +111,34 @@ namespace TypingChinese
            
 
             //注册load事件
-            this.Load += Form1_Load;
+            //this.Load += Form1_Load;
             this.FormClosing += Form1_FormClosing; // 注册关闭事件
             this.textBox2.KeyDown += textBox1_KeyDown; //绑定按下事件
+            //用于解决补帧无法输入中文的问题 待定
+            //IntPtr hwnd = FindWindow(null, "Lossless Scaling");
+            //GetWindowThreadProcessId(hwnd, out uint pid);
+            //uint Currentid = GetCurrentThreadId();
+            //AttachThreadInput(Currentid, pid, true);
+
 
             trayMenu = new ContextMenuStrip();//初始化菜单
             trayMenu.Items.Add("显示窗口", null, (s, e) => ShowWindow());//添加菜单项
-            trayMenu.Items.Add("恢复默认", null, (s, e) => PositionWindow());//添加菜单项
+            trayMenu.Items.Add("重置窗口", null, (s, e) => PositionWindow());//添加菜单项
+            trayMenu.Items.Add("设置按键", null, (s, e) => SettingsMenuItem_Click(s, e));//添加菜单项
+            trayMenu.Items.Add("重置按键", null, (s, e) => ResetHotKeys());//添加菜单项
             trayMenu.Items.Add("退出程序", null, (s, e) =>
             {
                 trayIcon.Visible = false;//隐藏托盘图标
                 Application.Exit();
             });//添加退出菜单项
-
             trayIcon = new NotifyIcon//初始化托盘图标
             {
-                Text = "绝地潜兵中文输入工具 v1.4 by:assor",
+                Text = "绝地潜兵中文输入工具 v1.6 by:assor",
                 Icon = this.Icon,
                 ContextMenuStrip = trayMenu,
                 Visible = true
             };
+            trayIcon.MouseDoubleClick += TrayIcon_MouseClick;//绑定鼠标点击事件
 
 
         }
@@ -128,7 +149,7 @@ namespace TypingChinese
             base.OnResize(e);
             if (this.WindowState == FormWindowState.Minimized)
             {
-                this.Hide();//隐藏
+                this.Hide();
             }
         }
         //重写WndProc 
@@ -143,10 +164,7 @@ namespace TypingChinese
                 }
                 else
                 {
-                    this.Show();
-                    this.textBox2.Text = "";
-                    this.textBox2.Focus();
-                    this.Activate();
+                    ShowWindow();
                 }
             }
             base.WndProc(ref m);
@@ -154,10 +172,11 @@ namespace TypingChinese
 
         private void ShowWindow()
         {
+
             this.Show();
-            this.WindowState = FormWindowState.Normal; //设置窗体为正常状态
-            this.BringToFront();//将窗口置顶
+            this.textBox2.Text = "";
             this.textBox2.Focus();
+            this.Activate();
 
         }
 
@@ -171,14 +190,14 @@ namespace TypingChinese
         private void Form1_Load(object sender, EventArgs e)
         {
             //注册热键
-            RegisterHotKey(this.Handle, HOTKET_ID, MOD_CTRL, (uint)Keys.T);
+            LoadAndRegisterHotKey();
         }
 
 
 
         private void textBox1_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Enter)
+            if (e.KeyCode == Keys.Enter && !e.Control && !e.Shift && !e.Alt)
             {
                 e.Handled = true;//表示该事件已被处理
                 e.SuppressKeyPress = true;//抑制按键的进一步处理，防止按键事件传递到其他控件或处理程序
@@ -189,9 +208,8 @@ namespace TypingChinese
                     return;
                 }
                 this.Hide();
-                IntPtr hWnd = FindWindow("stingray_window", null); //寻找指定窗口
-                SetForegroundWindow(hWnd);
-                SimulateUnicodeTyping(text); //
+                SetForegroundWindow(FindWindow("stingray_window", null)) ; //寻找指定窗口           
+                SimulateUnicodeTyping(text); 
             }
 
         }
@@ -199,9 +217,10 @@ namespace TypingChinese
         //模拟输入文本
         private void SimulateUnicodeTyping(string text)
         {
-            // List<INPUT> inputs = new List<INPUT>();//实例化一个list 用于接收input这个结构的值
+            var inputs = new List<INPUT>();//
+
             int count = 0;//计数器          
-            INPUT EnterDown = new INPUT
+            var EnterDown = new INPUT
             {
                 type = INPUT_KEYBOARD,
                 mkhi = new MOUSEKEYBDHARDWAREINPUT
@@ -216,7 +235,7 @@ namespace TypingChinese
                     }
                 }
             };
-            INPUT EnterUp = new INPUT
+            var EnterUp = new INPUT
             {
                 type = INPUT_KEYBOARD,
                 mkhi = new MOUSEKEYBDHARDWAREINPUT
@@ -232,105 +251,74 @@ namespace TypingChinese
                 }
             };
 
-
-
             Thread.Sleep(100); //休眠 然后继续发送
             SendInput(1, new INPUT[] { EnterDown }, Marshal.SizeOf(typeof(INPUT)));
             Thread.Sleep(50);
             SendInput(1, new INPUT[] { EnterUp }, Marshal.SizeOf(typeof(INPUT)));
+
+
             foreach (char c in text)
             {//循环处理字符串 然后将结构封装进inputs这个list里
-
-                if (count == 9)
+                var down = new INPUT
                 {
-
-                    Thread.Sleep(200); //休眠500ms 然后继续发送
+                    type = INPUT_KEYBOARD,
+                    mkhi = new MOUSEKEYBDHARDWAREINPUT
+                    {
+                        ki = new KEYBDINPUT
+                        {
+                            wVk = 0,
+                            wScan = c,
+                            dwFlags = KEYEVENTF_UNICODE,
+                            time = 0,
+                            dwExtraInfo = IntPtr.Zero
+                        }
+                    }
+                };
+                var up = new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    mkhi = new MOUSEKEYBDHARDWAREINPUT
+                    {
+                        ki = new KEYBDINPUT
+                        {
+                            wVk = 0,
+                            wScan = c,
+                            dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
+                            time = 0,
+                            dwExtraInfo = IntPtr.Zero
+                        }
+                    }
+                };
+                inputs.Add(down); //按下
+                inputs.Add(up);//抬起
+                count++;
+                if (count == 10)
+                {//游戏有缓冲区 10个按键就会堵塞 所以每10个按键休眠
+                    Thread.Sleep(100);
                     count = 0;//重新将计数器清零
-                    INPUT down = new INPUT
-                    {
-                        type = INPUT_KEYBOARD,
-                        mkhi = new MOUSEKEYBDHARDWAREINPUT
-                        {
-                            ki = new KEYBDINPUT
-                            {
-                                wVk = 0,
-                                wScan = c,
-                                dwFlags = KEYEVENTF_UNICODE,
-                                time = 0,
-                                dwExtraInfo = IntPtr.Zero
-                            }
-                        }
-                    };
-                    INPUT up = new INPUT
-                    {
-                        type = INPUT_KEYBOARD,
-                        mkhi = new MOUSEKEYBDHARDWAREINPUT
-                        {
-                            ki = new KEYBDINPUT
-                            {
-                                wVk = 0,
-                                wScan = c,
-                                dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
-                                time = 0,
-                                dwExtraInfo = IntPtr.Zero
-                            }
-                        }
-                    };
-
-                    //不使用list一起发送 改成循环挨个发送
-                    SendInput(1, new INPUT[] { down }, Marshal.SizeOf(typeof(INPUT)));
-                    SendInput(1, new INPUT[] { up }, Marshal.SizeOf(typeof(INPUT)));
-
+                    SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+                    inputs.Clear();//发送完成清空list
                 }
-                else
-                {
-                    INPUT down = new INPUT
-                    {
-                        type = INPUT_KEYBOARD,
-                        mkhi = new MOUSEKEYBDHARDWAREINPUT
-                        {
-                            ki = new KEYBDINPUT
-                            {
-                                wVk = 0,
-                                wScan = c,
-                                dwFlags = KEYEVENTF_UNICODE,
-                                time = 0,
-                                dwExtraInfo = IntPtr.Zero
-                            }
-                        }
-                    };
-                    INPUT up = new INPUT
-                    {
-                        type = INPUT_KEYBOARD,
-                        mkhi = new MOUSEKEYBDHARDWAREINPUT
-                        {
-                            ki = new KEYBDINPUT
-                            {
-                                wVk = 0,
-                                wScan = c,
-                                dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
-                                time = 0,
-                                dwExtraInfo = IntPtr.Zero
-                            }
-                        }
-                    };
-
-                    //不使用list一起发送 改成循环挨个发送
-                    SendInput(1, new INPUT[] { down }, Marshal.SizeOf(typeof(INPUT)));
-                    SendInput(1, new INPUT[] { up }, Marshal.SizeOf(typeof(INPUT)));
-                    count++;
-                }
+  
             }
+            if (inputs.Count > 0)
+            {//处理剩余的按键
+                Thread.Sleep(100);//防止游戏反应不过来
+                SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+                count = 0;
+                inputs.Clear();//发送完成清空list
+            }
+
             Thread.Sleep(100); //休眠 然后继续发送
             SendInput(1, new INPUT[] { EnterDown }, Marshal.SizeOf(typeof(INPUT)));
-            Thread.Sleep(50);
+            Thread.Sleep(100);
             SendInput(1, new INPUT[] { EnterUp }, Marshal.SizeOf(typeof(INPUT)));
 
         }
         private void LoadWindowPosition()
         {
-            try
-            { //载入保存的位置
+         
+             //载入保存的位置
                 if(HellDivers2_Chinese_Input.Properties.Settings.Default.LastLocation != Point.Empty)
                 {
                     this.Location = HellDivers2_Chinese_Input.Properties.Settings.Default.LastLocation;
@@ -339,11 +327,7 @@ namespace TypingChinese
                 {
                     PositionWindow();
                 }
-            }
-            catch 
-            {//如果没有就使用默认的
-                PositionWindow();
-            }
+       
         }
 
         private void PositionWindow()
@@ -357,6 +341,16 @@ namespace TypingChinese
                 screen.Right - this.Width - rightMargin,
                 screen.Bottom - this.Height - bottomMargin
             );
+        }
+
+
+        private void ResetHotKeys()
+        {
+            currentKey = (uint)Keys.T;
+            currentModifiers = 0x0002;
+            RegisterHotKey(this.Handle, HOTKET_ID, currentModifiers, currentKey);
+            MessageBox.Show("热键已重置为CTRL + T");
+
         }
 
         private void SetupDragging()
@@ -385,7 +379,7 @@ namespace TypingChinese
         {
             if (isDragging == true)
             {
-                Point currentCursor = Cursor.Position;//获取当前鼠标位置
+                var currentCursor = Cursor.Position;//获取当前鼠标位置
                 //计算鼠标位置变化
                 int deltaX = currentCursor.X - lastCursor.X;
                 int deltaY = currentCursor.Y - lastCursor.Y;
@@ -403,6 +397,51 @@ namespace TypingChinese
             }
             
         }
+        private void TrayIcon_MouseClick(object sender, MouseEventArgs e)
+        {//处理托盘图标的点击事件
+            if (e.Button == MouseButtons.Left && e.Clicks==2)
+            {
+                if(this.Visible)              
+                    this.Hide();      
+                else
+                    ShowWindow();
+            }
+        }
+        private void SettingsMenuItem_Click(object sender, EventArgs e)
+        {
+            UnregisterHotKey(this.Handle, HOTKET_ID);
+            var SettingsForm = new SettingsForm();
+            //建立一个非模态的窗体
+
+            if(SettingsForm.ShowDialog()== DialogResult.OK)
+            {
+                LoadAndRegisterHotKey();
+            }
+            else
+            {
+                RegisterHotKey(this.Handle, HOTKET_ID, currentModifiers, currentKey);
+            }
+
+        }
+
+        private void LoadAndRegisterHotKey()
+        {
+            //得到新的热键
+            currentKey = HellDivers2_Chinese_Input.Properties.Settings.Default.Hotkey;
+            currentModifiers = HellDivers2_Chinese_Input.Properties.Settings.Default.HotkeyModifiers;
+
+            if(currentKey == 0)
+            {
+                currentKey = (uint)Keys.T;
+                currentModifiers=0x0002;
+            }
+
+            if (!RegisterHotKey(this.Handle, HOTKET_ID, currentModifiers, currentKey))
+            {
+                MessageBox.Show("注册热键失败！", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }       
+        }
+
 
     }
 }

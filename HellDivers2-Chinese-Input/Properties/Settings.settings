@@ -5,5 +5,11 @@
     <Setting Name="LastLocation" Type="System.Drawing.Point" Scope="User">
       <Value Profile="(Default)">0, 0</Value>
     </Setting>
+    <Setting Name="HotkeyModifiers" Type="System.UInt32" Scope="User">
+      <Value Profile="(Default)">2</Value>
+    </Setting>
+    <Setting Name="Hotkey" Type="System.UInt32" Scope="User">
+      <Value Profile="(Default)">84</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

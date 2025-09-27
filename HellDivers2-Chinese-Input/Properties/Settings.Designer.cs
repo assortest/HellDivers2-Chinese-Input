@@ -34,5 +34,29 @@ namespace HellDivers2_Chinese_Input.Properties {
                 this["LastLocation"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2")]
+        public uint HotkeyModifiers {
+            get {
+                return ((uint)(this["HotkeyModifiers"]));
+            }
+            set {
+                this["HotkeyModifiers"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("84")]
+        public uint Hotkey {
+            get {
+                return ((uint)(this["Hotkey"]));
+            }
+            set {
+                this["Hotkey"] = value;
+            }
+        }
     }
 }

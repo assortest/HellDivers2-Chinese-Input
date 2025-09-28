@@ -65,6 +65,10 @@ namespace TypingChinese
         private NotifyIcon trayIcon; //定义一个托盘图标
         private ContextMenuStrip trayMenu; //用于托盘的菜单
 
+        //保存按键相关
+        private SettingsForm settingsForm;
+        private bool isSettingsWindowOpen = false;
+
         //存储当前热键
         private uint currentModifiers;
         private uint currentKey;
@@ -409,19 +413,29 @@ namespace TypingChinese
         }
         private void SettingsMenuItem_Click(object sender, EventArgs e)
         {
-            UnregisterHotKey(this.Handle, HOTKET_ID);
-            var SettingsForm = new SettingsForm();
-            //建立一个非模态的窗体
-
-            if(SettingsForm.ShowDialog()== DialogResult.OK)
+            if (isSettingsWindowOpen == true) return;
+            try
             {
-                LoadAndRegisterHotKey();
-            }
-            else
-            {
-                RegisterHotKey(this.Handle, HOTKET_ID, currentModifiers, currentKey);
-            }
+                isSettingsWindowOpen = true;
+                //建立一个非模态的窗体
+                UnregisterHotKey(this.Handle, HOTKET_ID);
+                settingsForm = new SettingsForm();
 
+                if (settingsForm.ShowDialog() == DialogResult.OK)
+                {
+                    LoadAndRegisterHotKey();
+                }
+                else
+                {
+                    RegisterHotKey(this.Handle, HOTKET_ID, currentModifiers, currentKey);
+                }
+            }
+            finally
+            {
+                if(settingsForm != null)
+                    settingsForm.Dispose();
+                isSettingsWindowOpen = false;
+            }
         }
 
         private void LoadAndRegisterHotKey()

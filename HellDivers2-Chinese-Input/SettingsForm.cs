@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -11,7 +12,9 @@ using System.Windows.Forms;
 namespace TypingChinese
 {
     public partial class SettingsForm : Form
-    {
+    { 
+        [DllImport("user32.dll")]
+        static extern bool HideCaret(IntPtr hWnd);
         private uint newModifiers;
         private Keys newKey;
 
@@ -19,6 +22,9 @@ namespace TypingChinese
         {
             InitializeComponent();
             this.Load += SettingsForm_Load;
+            this.txtHotkey.ReadOnly = true;
+            this.TopMost = true;
+            this.txtHotkey.GotFocus +=(sender, e)=>HideCaret(txtHotkey.Handle);
             this.txtHotkey.KeyDown +=txtHotkey_KeyDown;
             this.btnSave.Click += btnSave_Click;
             this.btnCancel.Click += btnCancel_Click;

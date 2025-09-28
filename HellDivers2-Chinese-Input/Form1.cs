@@ -417,7 +417,7 @@ namespace TypingChinese
             try
             {
                 isSettingsWindowOpen = true;
-                //建立一个非模态的窗体
+                //建立一个模态的窗体
                 UnregisterHotKey(this.Handle, HOTKET_ID);
                 settingsForm = new SettingsForm();
 

@@ -1,4 +1,4 @@
-﻿namespace TypingChinese
+﻿namespace HellDivers2_Chinese_Input
 {
     partial class SettingsForm
     {
@@ -79,6 +79,8 @@
             this.Controls.Add(this.btnSave);
             this.Controls.Add(this.txtHotkey);
             this.Controls.Add(this.label1);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
             this.Name = "SettingsForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "SettingsForm";

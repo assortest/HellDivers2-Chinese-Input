@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace TypingChinese
+namespace HellDivers2_Chinese_Input
 {
     internal static class Program
     {
@@ -22,7 +22,7 @@ namespace TypingChinese
                 {
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
-                    Application.Run(new Form1());
+                    Application.Run(new MainForm());
                     
                 }
                 else

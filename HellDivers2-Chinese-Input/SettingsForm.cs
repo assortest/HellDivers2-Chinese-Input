@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
+﻿using HellDivers2_Chinese_Input.Services;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -9,10 +7,14 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace TypingChinese
+
+namespace HellDivers2_Chinese_Input
 {
     public partial class SettingsForm : Form
-    { 
+    {
+        private readonly ConfigurationService _configService;
+        private readonly HotkeyService _hotkeyService;
+
         [DllImport("user32.dll")]
         static extern bool HideCaret(IntPtr hWnd);
         private uint newModifiers;
@@ -20,12 +22,14 @@ namespace TypingChinese
 
         public SettingsForm()
         {
+            _configService = new ConfigurationService();
+            _hotkeyService = new HotkeyService(_configService);
             InitializeComponent();
             this.Load += SettingsForm_Load;
             this.txtHotkey.ReadOnly = true;
             this.TopMost = true;
-            this.txtHotkey.GotFocus +=(sender, e)=>HideCaret(txtHotkey.Handle);
-            this.txtHotkey.KeyDown +=txtHotkey_KeyDown;
+            this.txtHotkey.GotFocus += (sender, e) => HideCaret(txtHotkey.Handle);
+            this.txtHotkey.KeyDown += txtHotkey_KeyDown;
             this.btnSave.Click += btnSave_Click;
             this.btnCancel.Click += btnCancel_Click;
         }
@@ -34,17 +38,17 @@ namespace TypingChinese
         private void SettingsForm_Load(object sender, EventArgs e)
         {
             //设置图标
-            this.Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             //读取以及保存的配置
-            uint currentModifiers = HellDivers2_Chinese_Input.Properties.Settings.Default.HotkeyModifiers;
-            uint currentKey = HellDivers2_Chinese_Input.Properties.Settings.Default.Hotkey;
-            if(currentKey == 0)
+            var (currentModifiers, currentKey) = _configService.GetHotKey();
+
+            if (currentKey == 0)
             {
                 //如果配置为0，则设置默认值
                 newModifiers = 0x0002;
                 newKey = Keys.T;
 
-            }    
+            }
             else
             {
                 newModifiers = currentModifiers;
@@ -61,12 +65,12 @@ namespace TypingChinese
             e.SuppressKeyPress = true;
 
             //忽略单独按键
-            if(e.KeyCode==Keys.ControlKey || e.KeyCode == Keys.ShiftKey || e.KeyCode==Keys.Menu)
+            if (e.KeyCode == Keys.ControlKey || e.KeyCode == Keys.ShiftKey || e.KeyCode == Keys.Menu)
             {
                 return;
             }
             //获取组合按键
-            newModifiers =0;
+            newModifiers = 0;
             if (e.Control) newModifiers |= 0x0002;
             if (e.Shift) newModifiers |= 0x0004;
             if (e.Alt) newModifiers |= 0x0001;
@@ -81,10 +85,8 @@ namespace TypingChinese
         private void btnSave_Click(object sender, EventArgs e)
         {
             //保存配置
-            HellDivers2_Chinese_Input.Properties.Settings.Default.HotkeyModifiers = newModifiers;
-            HellDivers2_Chinese_Input.Properties.Settings.Default.Hotkey = (uint)newKey;
-            HellDivers2_Chinese_Input.Properties.Settings.Default.Save();
-            
+            _configService.SaveHotKey(newModifiers, (uint)newKey);
+
             this.DialogResult = DialogResult.OK;
             this.Close();
 
@@ -108,6 +110,6 @@ namespace TypingChinese
             return sb.ToString();
         }
 
-      
+
     }
 }
